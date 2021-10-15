@@ -9,24 +9,18 @@
 //SELECT
 
 //int select(int nfds, fd_set *readfds, fd_set *writefds,
-//                  fd_set *exceptfds, struct timeval *timeout);
+// fd_set *exceptfds, struct timeval *timeout);
 
 // Allow  a  program  to  monitor multiple file descriptors, waiting until one or more of the file descriptors become
-//    "ready" for some class of I/O operation. 
+// "ready" for some class of I/O operation. 
 // A file descriptor is considered ready if it is possible to perform a corre‐
-//    sponding I/O operation without blocking.
-
+// sponding I/O operation without blocking.
 
 //select() can monitor only file descriptors numbers that are less than FD_SETSIZE; poll(2) does not have this limitation.
-
-
-
 
 //SOCKET
 
 //int socket(int domain, int type, int protocol);
-
-
 
 //accept
 //listen
@@ -34,8 +28,6 @@
 //recv
 //bind
 //sprintf
-
-
 
 #include <string.h>
 #include <stdio.h>
@@ -46,14 +38,12 @@
 #include <sys/select.h>
 #include <netinet/in.h>
 
-typedef struct		s_user 
+typedef struct      s_user 
 {
-	int				fd;
+	int             fd;
     int             id;
-	struct s_user	*next;
-}					t_user;
-
-//t_user *g_users = NULL;
+	struct s_user   *next;
+}                   t_user;
 
 int sock_fd = 0;
 int g_id = 0;
@@ -98,7 +88,7 @@ int get_id(int fd)
 
 int		get_max_fd() 
 {
-	int	max = sock_fd;
+    int	max = sock_fd;
     t_user *tmp = get_users(NULL);
 
     while (tmp) {
@@ -130,7 +120,7 @@ t_user *new_user(int fd, int id, t_user *next) {
 	if (!(new = calloc(1, sizeof(t_user))))
 		fatal();
 
-	new->id = g_id++;
+    new->id = g_id++;
     new->fd = fd;
     new->next = NULL;
 
