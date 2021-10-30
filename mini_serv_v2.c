@@ -160,6 +160,27 @@ uint32_t iptou(uint8_t o1, uint8_t o2, uint8_t o3, uint8_t o4)
     return res; 
 }
 
+int	is_little_endian(void) {
+	int i = 1;
+	return *(char *)&i;
+}
+
+uint16_t my_htons(uint16_t val) {
+	if (is_little_endian()) {
+		return ((val >> 8) | (val << 8));
+	} else {
+		return (val);
+	}
+}
+
+uint32_t my_htonl(uint32_t val) {
+	if (is_little_endian()) {
+		return (my_htons((uint16_t)val) << 16 | my_htons(val >> 16));
+	} else {
+		return (val);
+	}
+}
+
 int main(int ac, char **av)
 {
     if (ac != 2) {
@@ -172,8 +193,8 @@ int main(int ac, char **av)
 
     in_port_t port = atoi(av[1]);
     servaddr.sin_family = AF_INET; 
-    servaddr.sin_addr.s_addr = htonl(iptou(127, 0, 0, 1));
-    servaddr.sin_port = htons(port);
+    servaddr.sin_addr.s_addr = my_htonl(iptou(127, 0, 0, 1));
+    servaddr.sin_port = my_htons(port);
 
     if ((listener = socket(PF_INET, SOCK_STREAM, 0)) < 0)
         fatal();
