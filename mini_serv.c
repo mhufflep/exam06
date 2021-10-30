@@ -1,42 +1,13 @@
-#include <unistd.h>
+#include <string.h>
 #include <stdlib.h>
-#include <string.h>
-
-#include <sys/time.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-
-//SELECT
-
-//int select(int nfds, fd_set *readfds, fd_set *writefds,
-// fd_set *exceptfds, struct timeval *timeout);
-
-// Allow  a  program  to  monitor multiple file descriptors, waiting until one or more of the file descriptors become
-// "ready" for some class of I/O operation. 
-// A file descriptor is considered ready if it is possible to perform a corre‐
-// sponding I/O operation without blocking.
-
-//select() can monitor only file descriptors numbers that are less than FD_SETSIZE; poll(2) does not have this limitation.
-
-//SOCKET
-
-//int socket(int domain, int type, int protocol);
-
-//accept
-//listen
-//send
-//recv
-//bind
-//sprintf
-
-#include <string.h>
+#include <unistd.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
+
 #include <netdb.h>
 #include <sys/socket.h>
 #include <sys/select.h>
 #include <netinet/in.h>
+//#include <arpa/inet.h>
 
 typedef struct      s_user 
 {
@@ -45,21 +16,21 @@ typedef struct      s_user
 	struct s_user   *next;
 }                   t_user;
 
-int sock_fd = 0;
-int g_id = 0;
+int listener = -1;
+int max_id = -1;
+int max_fd = -1;
 
-fd_set curr_sock;
-fd_set cpy_read;
-fd_set cpy_write;
+fd_set master;
+fd_set read_set;
+fd_set write_set;
 
-char msg[42];
-char str[42*4096];
-char tmp[42*4096];
-char buf[42*4096 + 42];
+//int ids[FD_SETSIZE];
+char str[100000];
+char buf[100000 + 50];
 
-void print_error(char *msg) {
-	
-	write(2, msg, strlen(msg));
+void print_error(char *err_msg) {
+	write(2, err_msg, strlen(err_msg));
+	write(2, "\n", 1);
 }
 
 void error(char *err_msg) {
@@ -67,10 +38,19 @@ void error(char *err_msg) {
 	exit(1);
 }
 
-void fatal() 
-{
-	close(sock_fd);
+void fatal() {
+	close(listener);
 	error("Fatal error");
+}
+
+t_user *get_users(t_user *set) {
+
+	static t_user *users = NULL;
+
+	if (users == NULL)
+		users = set;
+
+	return users;
 }
 
 int get_id(int fd)
@@ -88,58 +68,62 @@ int get_id(int fd)
 
 int		get_max_fd() 
 {
-    int	max = sock_fd;
-    t_user *tmp = get_users(NULL);
+    int	max = listener;
+    t_user *usr = get_users(NULL);
 
-    while (tmp) {
-        if (tmp->fd > max)
-            max = tmp->fd;
-        tmp = tmp->next;
+    while (usr) {
+        if (usr->fd > max) {
+            max = usr->fd;
+        }
+        usr = usr->next;
     }
     return (max);
 }
 
-void	send_all(int fd, char *str_req)
+void	send_all(int fd, char *message)
 {
-    t_user *temp = g_users;
+    t_user *usr = get_users(NULL);
 
-    while (temp)
+    while (usr)
     {
-        if (temp->fd != fd && FD_ISSET(temp->fd, &cpy_write))
+        if (usr->fd != fd && FD_ISSET(usr->fd, &write_set))
         {
-            if (send(temp->fd, str_req, strlen(str_req), 0) < 0)
-                fatal();
+            if (send(usr->fd, message, strlen(message), 0) < 0) {
+                // do not need fatal();
+            }
         }
-        temp = temp->next;
+        usr = usr->next;
     }
 }
 
 t_user *new_user(int fd, int id, t_user *next) {
+
 	t_user *new;
 
 	if (!(new = calloc(1, sizeof(t_user))))
 		fatal();
 
-    new->id = g_id++;
+    new->id = id;
     new->fd = fd;
     new->next = NULL;
 
 	return new;
 }
 
-void lst_remove(t_user **head, int id) {
+t_user* lst_remove(t_user **head, int fd) {
+
 	t_user *tmp = NULL;
 	t_user *rem = NULL;
 
 	if (head && *head) {
 		tmp = *head;
 
-		if (tmp->id == id) {
+		if (tmp->fd == fd) {
         	rem = *head;
 			*head = (*head)->next;
 		}
     	else {
-			while (tmp && tmp->next && tmp->next->id != id) {
+			while (tmp && tmp->next && tmp->next->fd != fd) {
 	            tmp = tmp->next;
 			}
 			if (tmp->next) {
@@ -147,37 +131,34 @@ void lst_remove(t_user **head, int id) {
 	        	tmp->next = tmp->next->next;
 			}
 		}
-		
-		if (rem != NULL) {
-			free(rem);
-			bzero(rem, sizeof(*rem));
-		}
     }
+    return rem;
 }
 
 void lst_push(t_user **head, t_user *new) {
+
 	t_user *tmp;
 	
-	if (!head) {
-        *head = new;
-    }
-    else
-    {
-		tmp = *head;
-        while (tmp->next) {
-            tmp = tmp->next;
-		}
-        tmp->next = new;
+    if (head) {
+    	if (*head == NULL) {
+            *head = new;
+        }
+        else
+        {
+    		tmp = *head;
+            while (tmp->next) {
+                tmp = tmp->next;
+    		}
+            tmp->next = new;
+        }
     }
 }
 
-t_user *get_users(t_user *set) {
-	static t_user *users;
+void notify(int fd, int id, char *format) {
+    char msg[50] = {0};
 
-	if (users == NULL)
-		users = set;
-
-	return users;
+    sprintf(msg, format, id);
+    send_all(fd, msg);
 }
 
 void add_user()
@@ -186,45 +167,51 @@ void add_user()
     socklen_t len = sizeof(useraddr);
 
     int user_fd;
-    if ((user_fd = accept(sock_fd, &useraddr, &len)) < 0)
-        fatal();
+    if ((user_fd = accept(listener, &useraddr, &len)) < 0) {
+        // do not need fatal();
+    }
 
-	//Adding a new user to list	
 	t_user *head = get_users(NULL);
-	t_user *new = new_user(user_fd, g_id, NULL);
+	t_user *new = new_user(user_fd, max_id, NULL);
 	lst_push(&head, new);
+    
+    notify(user_fd, max_id, "server: user %d just arrived\n");
 
-    sprintf(msg, "server: user %d just arrived\n", g_id);
-
-	send_all(user_fd, msg);
-    FD_SET(user_fd, &curr_sock);
+    max_fd = get_max_fd();
+    max_id++;
+  
+    FD_SET(user_fd, &master);
 }
 
-int rm_user(int fd)
+void rm_user(int fd)
 {
     t_user *head = get_users(NULL);
-    
-    int id = get_id(fd);
-	lst_remove(&head, id);
+	t_user *rem = lst_remove(&head, fd);
 
-    return (id);
+    if (rem != NULL) {
+
+        notify(rem->fd, rem->id, "server: user %d just left\n");
+
+        max_fd = get_max_fd();
+        
+        FD_CLR(rem->fd, &master);
+        close(rem->fd);
+        free(rem);
+    }
 }
 
-void ex_msg(int fd)
+void send_by_line(int fd)
 {
     int i = 0;
-    int j = 0;
-
+    int id = get_id(fd);
+    
     while (str[i])
     {
-        tmp[j] = str[i];
-        j++;
         if (str[i] == '\n')
         {
-            sprintf(buf, "user %d: %s", get_id(fd), tmp);
+            str[i] = '\0';
+            sprintf(buf, "client %d: %s\n", id, str);
             send_all(fd, buf);
-            j = 0;
-            bzero(&tmp, strlen(tmp));
             bzero(&buf, strlen(buf));
         }
         i++;
@@ -232,74 +219,87 @@ void ex_msg(int fd)
     bzero(&str, strlen(str));
 }
 
+uint32_t iptou(uint8_t o1, uint8_t o2, uint8_t o3, uint8_t o4)
+{
+
+    uint32_t res = 0U;
+    
+    res = (res | o1) << 8;
+    res = (res | o2) << 8;
+    res = (res | o3) << 8;
+    res = res | o4;
+
+    return res; 
+}
+
+
 int main(int ac, char **av)
 {
     if (ac != 2)
     {
-		error("Wrong number of arguments");
-        exit(1);
+    	error("Wrong number of arguments");
+    	exit(1);
     }
 
-	//Socket addr structure creation
     struct sockaddr_in servaddr;
     bzero(&servaddr, sizeof(servaddr));
 
 	//Setting params in the structure
-    uint16_t port = atoi(av[1]);
+    in_port_t port = atoi(av[1]);
 	servaddr.sin_family = AF_INET; 
-	servaddr.sin_addr.s_addr = htonl(2130706433); //127.0.0.1
+	servaddr.sin_addr.s_addr = htonl(iptou(127, 0, 0, 1)); // use inet_addr() or inet_pton() instead
 	servaddr.sin_port = htons(port);
 
-    //Create socket
-	if ((sock_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+	if ((listener = socket(PF_INET, SOCK_STREAM, 0)) < 0)
         fatal();
 
-	// Bind socket to serveraddr
-    if (bind(sock_fd, (const struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
+    if (bind(listener, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
         fatal();
 
-	// Listen socket
-    if (listen(sock_fd, 0) < 0)
+    if (listen(listener, 10) < 0)
         fatal();
     
-    FD_ZERO(&curr_sock);
-    FD_SET(sock_fd, &curr_sock);
-    bzero(&tmp, sizeof(tmp));
+    FD_ZERO(&master);
+    FD_SET(listener, &master);
     bzero(&buf, sizeof(buf));
     bzero(&str, sizeof(str));
 
-    while(1)
-    {
-		int max_fd = get_max_fd();
+    max_fd = listener;
 
-        cpy_write = cpy_read = curr_sock;
-        if (select(max_fd + 1, &cpy_read, &cpy_write, NULL, NULL) < 0)
+    t_user head;
+
+    head.fd = max_fd++;
+    head.id = max_id++;
+    head.next = NULL;
+    get_users(&head);
+    
+    for (;;)
+    {
+        write_set = master;
+        read_set = master;
+   
+        if (select(max_fd + 1, &read_set, &write_set, NULL, NULL) < 0)
             continue ;
 		
         for (int fd = 0; fd <= max_fd; fd++)
         {
-            if (FD_ISSET(fd, &cpy_read))
+            if (FD_ISSET(fd, &read_set))
             {
-                if (fd == sock_fd)
+                if (fd == listener)
                 {
-                    bzero(&msg, sizeof(msg));
                     add_user();
                     break;
                 }
-                else if (recv(fd, str, sizeof(str), 0) <= 0)
-                {
-					bzero(&msg, sizeof(msg));
-                    sprintf(msg, "server: user %d just left\n", rm_user(fd));
-                    send_all(fd, msg);
-	                FD_CLR(fd, &curr_sock);
-                    close(fd);
+                else if (recv(fd, str, sizeof(str), 0) <= 0) {           
+                    rm_user(fd);
                     break;
                 }
                 else {
-                    ex_msg(fd);
+                    send_by_line(fd);
                 }
             }
-        }       
+        }
     }
+
     return (0);
 }
