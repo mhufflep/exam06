@@ -11,9 +11,9 @@
 
 typedef struct      s_user 
 {
-	int             fd;
+    int             fd;
     int             id;
-	struct s_user   *next;
+    struct s_user   *next;
 }                   t_user;
 
 int listener = -1;
@@ -48,7 +48,7 @@ t_user *get_users(t_user *set) {
 	static t_user *users = NULL;
 
 	if (users == NULL)
-		users = set;
+	    users = set;
 
 	return users;
 }
@@ -98,46 +98,46 @@ void	send_all(int fd, char *message)
 
 t_user *new_user(int fd, int id, t_user *next) {
 
-	t_user *new;
+    t_user *new;
 
-	if (!(new = calloc(1, sizeof(t_user))))
-		fatal();
+    if (!(new = calloc(1, sizeof(t_user))))
+	  fatal();
 
     new->id = id;
     new->fd = fd;
     new->next = NULL;
 
-	return new;
+    return new;
 }
 
 t_user* lst_remove(t_user **head, int fd) {
 
-	t_user *tmp = NULL;
-	t_user *rem = NULL;
+    t_user *tmp = NULL;
+    t_user *rem = NULL;
 
-	if (head && *head) {
-		tmp = *head;
+    if (head && *head) {
+	tmp = *head;
 
-		if (tmp->fd == fd) {
-        	rem = *head;
-			*head = (*head)->next;
-		}
-    	else {
-			while (tmp && tmp->next && tmp->next->fd != fd) {
-	            tmp = tmp->next;
-			}
-			if (tmp->next) {
-				rem = tmp->next;
-	        	tmp->next = tmp->next->next;
-			}
-		}
+	if (tmp->fd == fd) {
+     	    rem = *head;
+	    *head = (*head)->next;
+	}
+        else {
+            while (tmp && tmp->next && tmp->next->fd != fd) {
+	        tmp = tmp->next;
+            }
+	    if (tmp->next) {
+                rem = tmp->next;
+	        tmp->next = tmp->next->next;
+	    }
+	}
     }
     return rem;
 }
 
 void lst_push(t_user **head, t_user *new) {
 
-	t_user *tmp;
+    t_user *tmp;
 	
     if (head) {
     	if (*head == NULL) {
@@ -145,10 +145,10 @@ void lst_push(t_user **head, t_user *new) {
         }
         else
         {
-    		tmp = *head;
+    	    tmp = *head;
             while (tmp->next) {
                 tmp = tmp->next;
-    		}
+    	    }
             tmp->next = new;
         }
     }
@@ -171,9 +171,9 @@ void add_user()
         // do not need fatal();
     }
 
-	t_user *head = get_users(NULL);
-	t_user *new = new_user(user_fd, max_id, NULL);
-	lst_push(&head, new);
+    t_user *head = get_users(NULL);
+    t_user *new = new_user(user_fd, max_id, NULL);
+    lst_push(&head, new);
     
     notify(user_fd, max_id, "server: user %d just arrived\n");
 
@@ -186,7 +186,7 @@ void add_user()
 void rm_user(int fd)
 {
     t_user *head = get_users(NULL);
-	t_user *rem = lst_remove(&head, fd);
+    t_user *rem = lst_remove(&head, fd);
 
     if (rem != NULL) {
 
@@ -244,13 +244,13 @@ int main(int ac, char **av)
     struct sockaddr_in servaddr;
     bzero(&servaddr, sizeof(servaddr));
 
-	//Setting params in the structure
+    //Setting params in the structure
     in_port_t port = atoi(av[1]);
-	servaddr.sin_family = AF_INET; 
-	servaddr.sin_addr.s_addr = htonl(iptou(127, 0, 0, 1)); // use inet_addr() or inet_pton() instead
-	servaddr.sin_port = htons(port);
+    servaddr.sin_family = AF_INET; 
+    servaddr.sin_addr.s_addr = htonl(iptou(127, 0, 0, 1)); // use inet_addr() or inet_pton() instead
+    servaddr.sin_port = htons(port);
 
-	if ((listener = socket(PF_INET, SOCK_STREAM, 0)) < 0)
+    if ((listener = socket(PF_INET, SOCK_STREAM, 0)) < 0)
         fatal();
 
     if (bind(listener, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
