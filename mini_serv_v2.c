@@ -59,7 +59,7 @@ void	send_all(int fd, char *message)
 {
     for (size_t i = 0; i < FD_SETSIZE; i++)
     {
-        if (users[i] != fd && FD_ISSET(users[i], &write_set))
+        if (users[i] != fd && i != -1 && FD_ISSET(users[i], &write_set))
         {
             if (send(users[i], message, strlen(message), 0) < 0) {
                 // do not need fatal();
@@ -81,6 +81,7 @@ int get_free_id() {
             return i;
         }
     }
+    return -1;
 }
 
 void add_user()
