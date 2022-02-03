@@ -1,3 +1,7 @@
+// Not working correctly, need to fix
+// Basically need to replace get_free_id with get_max_id + 1
+
+
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
